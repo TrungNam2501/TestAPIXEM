@@ -187,11 +187,12 @@ namespace ServiceBBAPI
             string validationError = ValidateMesPlan(mesid, pday, machineDb);
             if (validationError != null) return validationError;
 
+            string partno = tenkeo.Trim();
+
             RubberTypeResult rubberType = RubberTypeMapper.Resolve(tenkeo);
             string makeo = rubberType.Makeo;
             string ptype = rubberType.Ptype;
             tenkeo = rubberType.NormalizedTenkeo;
-            string partno = tenkeo.Trim();
 
             string ptypeError = CheckAndOverridePtype(partno, ref makeo, ref ptype);
             if (ptypeError != null) return ptypeError;
@@ -262,11 +263,12 @@ namespace ServiceBBAPI
             string validationError = ValidateMesPlan(mesid, pday, machineDb);
             if (validationError != null) return validationError;
 
+            string partno = tenkeo.Trim();
+
             RubberTypeResult rubberType = RubberTypeMapper.Resolve(tenkeo);
             string makeo = rubberType.Makeo;
             string ptype = rubberType.Ptype;
             tenkeo = rubberType.NormalizedTenkeo;
-            string partno = tenkeo.Trim();
 
             string ptypeError = CheckAndOverridePtype(partno, ref makeo, ref ptype);
             if (ptypeError != null) return ptypeError;

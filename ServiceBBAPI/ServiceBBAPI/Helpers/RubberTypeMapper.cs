@@ -81,7 +81,7 @@ namespace ServiceBBAPI.Helpers
                 return new RubberTypeResult { Makeo = thu.makeo, Ptype = thu.ptype, NormalizedTenkeo = normalized };
             }
 
-            return new RubberTypeResult { Makeo = "RD", Ptype = "3", NormalizedTenkeo = tenkeo };
+            return new RubberTypeResult { Makeo = "", Ptype = "", NormalizedTenkeo = tenkeo };
         }
     }
 }
