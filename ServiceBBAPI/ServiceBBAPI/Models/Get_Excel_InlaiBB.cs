@@ -1,12 +1,7 @@
 ﻿using OfficeOpenXml;
-using ServiceBBAPI.SQLCNN;
 using System;
-using System.Collections.Generic;
-using System.Data;
 using System.Drawing;
 using System.IO;
-using System.Linq;
-using System.Web;
 
 namespace ServiceBBAPI.Models
 {
@@ -24,59 +19,10 @@ namespace ServiceBBAPI.Models
                     newFile = new FileInfo(pathFile);
                 }
 
-                //string maso = "";
-
-                ////-------------------------------
-
-                //string sqlBarcode = "SELECT * FROM prdebe where factory='V'  and prodat='" + pday + "' and partno='" + partno + "' and mesid ='" + mesid + "' order by intime";
-                //DataTable dtBar = SQL10_33.ExecuteQuery(sqlBarcode);
-                ////lấy barcode theo từng loại keo
-                //int a = 1;
-                //int b = 2;
-                //if (dtBar.Rows.Count > 0)
-                //{
-                //    for (int i = 0; i < dtBar.Rows.Count; i++)
-                //    {
-                //        if (i > 0)
-                //        {
-                //            a += 2;
-                //            b = a + 1;
-                //        }
-                //    }
-
-                //    string sqlweight = "select Plan_Num from [mfnsShareDB].[dbo].[IF_RtPlan2Mixing] where  Plan_Id ='"+mesid+"'"; 
-                //    DataTable dtweight = SQLCNN8MAY.ExecuteQuery(sqlweight,Machno);
-                //    int weight = Convert.ToInt32(dtweight.Rows[0][0].ToString());
-                //    try
-                //    {
-                //        if (weight == 1)
-                //        {
-                //            maso = a.ToString();
-                //            //string sqlfinish = "UPDATE KEORE SET comp = 'Y' where  recipe_name = '" + partno + "' and mesid = '" + mesid + "' and machno = '" + Machno + "' ";
-                //            //DataTable dtfinish = sql.ExecuteQuery(sqlfinish);
-                //        }
-                //        else
-                //        {
-                //            maso = a.ToString() + "-" + b.ToString();
-                //        }
-                //    }
-                //    catch (Exception)
-                //    {
-                //        return "Fail";
-                //    }
-                //}
-
-             
                 ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
 
                 using (ExcelPackage package = new ExcelPackage(newFile))
                 {
-                    //string sqlBarcode = "SELECT * FROM prdebe where factory='V' and prodat='" + pday + "' and partno='" + partno + "'" +
-                    //  " and class='" + classs + "' and barcode <= '" + barcode + "' order by intime";
-                    //DataTable dtBar = sql_198_1_9_93.ExecuteQuery(sqlBarcode);
-                    //string effdat = dtBar.Rows[0]["effdat"].ToString();
-
-                    //Check loại tem biểu thị
                     string tenloaithe = "";
                     string kichthuoc = "";
                     string KVS = "";
