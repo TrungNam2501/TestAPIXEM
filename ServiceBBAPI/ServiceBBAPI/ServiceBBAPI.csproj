@@ -105,6 +105,10 @@
     <Content Include="Web.config" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Helpers\BatchCalculator.cs" />
+    <Compile Include="Helpers\PalletValidator.cs" />
+    <Compile Include="Helpers\RubberTypeMapper.cs" />
+    <Compile Include="Helpers\ShiftHelper.cs" />
     <Compile Include="Models\Get_Excel_BB.cs" />
     <Compile Include="Models\Get_Excel_InlaiBB.cs" />
     <Compile Include="PrintExcel.cs" />
@@ -113,6 +117,7 @@
       <DependentUpon>ServiceBBintem.asmx</DependentUpon>
       <SubType>Component</SubType>
     </Compile>
+    <Compile Include="SQLCNN\DatabaseHelper.cs" />
     <Compile Include="SQLCNN\SQL10_33.cs" />
     <Compile Include="SQLCNN\SQL10_34.cs" />
     <Compile Include="SQLCNN\SQLBB_ExcuteWithIP.cs" />
