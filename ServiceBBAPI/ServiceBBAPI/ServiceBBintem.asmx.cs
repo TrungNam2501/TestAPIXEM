@@ -16,10 +16,14 @@ namespace ServiceBBAPI
     [System.ComponentModel.ToolboxItem(false)]
     public class ServiceBBintem : WebService
     {
+        private const string MachinePrefix = "V-BB37";
+        private const string DataFolderName = "Data";
+
         private readonly DatabaseHelper _erpDb = DatabaseConnections.GetErpDb();
         private readonly DatabaseHelper _erp34Db = DatabaseConnections.GetErp34Db();
         private readonly DatabaseHelper _inTemDb = DatabaseConnections.GetInTemDb();
 
+        
         private DatabaseHelper GetMachineDb(string machineKey)
         {
             return DatabaseConnections.GetMachineDb(machineKey);
@@ -74,26 +78,7 @@ namespace ServiceBBAPI
         [WebMethod]
         public DataSet Get_Mesid_list(string Machno)
         {
-            string shiftId = ShiftHelper.GetShiftMayBB();
-            string pday = ShiftHelper.GetPdayBB(shiftId);
-            DateTime myPday = DateTime.ParseExact(pday, "yyyyMMdd", CultureInfo.InvariantCulture);
-            string pdayFormatted = myPday.ToString("yyyy-MM-dd");
-
-            var machineDb = GetMachineDb(Machno);
-            DataTable dtMes = machineDb.ExecuteQuery(
-                @"SELECT a.Plan_Id, a.Recipe_Code 
-                  FROM [mfnsShareDB].[dbo].[IF_RtPlan2Mixing] a
-                  INNER JOIN [mfns].[dbo].[Ppt_GroupLot] b ON a.Plan_Id = b.MesPlanID
-                  WHERE a.Shift_Id = @shiftId 
-                    AND a.P_Date = @pday 
-                    AND a.Plan_Id NOT LIKE 'V%' 
-                    AND b.End_datetime IS NOT NULL",
-                new SqlParameter("@shiftId", shiftId),
-                new SqlParameter("@pday", pdayFormatted));
-
-            DataSet ds = new DataSet();
-            ds.Tables.Add(dtMes);
-            return ds;
+            return GetMesidListInternal(Machno, excludeVirtualPlans: true);
         }
 
         [WebMethod]
@@ -116,39 +101,19 @@ namespace ServiceBBAPI
         [WebMethod]
         public DataSet Get_Barcode(string mesid, string machno)
         {
-            string fullMachno = "V-BB37" + machno;
+            string fullMachno = BuildMachineCode(machno);
             DataTable dtBar = _erpDb.ExecuteQuery(
                 "SELECT barcode, weight FROM prdebe WHERE subno = '4' AND factory = 'V' AND mesid = @mesid AND machno = @machno",
                 new SqlParameter("@mesid", mesid),
                 new SqlParameter("@machno", fullMachno));
 
-            DataSet ds = new DataSet();
-            ds.Tables.Add(dtBar);
-            return ds;
+            return CreateDataSet(dtBar);
         }
 
         [WebMethod]
         public DataSet Get_Mesid_list_Inlai(string Machno)
         {
-            string shiftId = ShiftHelper.GetShiftMayBB();
-            string pday = ShiftHelper.GetPdayBB(shiftId);
-            DateTime myPday = DateTime.ParseExact(pday, "yyyyMMdd", CultureInfo.InvariantCulture);
-            string pdayFormatted = myPday.ToString("yyyy-MM-dd");
-
-            var machineDb = GetMachineDb(Machno);
-            DataTable dtMes = machineDb.ExecuteQuery(
-                @"SELECT a.Plan_Id, a.Recipe_Code 
-                  FROM [mfnsShareDB].[dbo].[IF_RtPlan2Mixing] a
-                  INNER JOIN [mfns].[dbo].[Ppt_GroupLot] b ON a.Plan_Id = b.MesPlanID
-                  WHERE a.Shift_Id = @shiftId 
-                    AND a.P_Date = @pday 
-                    AND b.End_datetime IS NOT NULL",
-                new SqlParameter("@shiftId", shiftId),
-                new SqlParameter("@pday", pdayFormatted));
-
-            DataSet ds = new DataSet();
-            ds.Tables.Add(dtMes);
-            return ds;
+            return GetMesidListInternal(Machno, excludeVirtualPlans: false);
         }
 
         [WebMethod(Description = "Lấy IP máy PDA đang gọi WebService")]
@@ -176,7 +141,7 @@ namespace ServiceBBAPI
             pday = myPday.ToString("yyyyMMdd");
             string indat = DateTime.Now.ToString("yyyyMMdd");
             string intime = DateTime.Now.ToString("HH:mm:ss");
-            string machno = "V-BB37" + Machno;
+            string machno = BuildMachineCode(Machno);
             string classs = shiftId;
             string slipno = classs + Machno + "-" + pday.Substring(4, 4);
             string spday = ShiftHelper.BuildSpday(myPday);
@@ -205,8 +170,6 @@ namespace ServiceBBAPI
             if (!float.TryParse(Soluong, out float soluongValue) || soluongValue < 30)
                 return "Lỗi! Trọng lượng không phù hợp!";
 
-            string planNum = GetPlanNum(mesid, machineDb);
-
             string mesValidation = ValidateMesExists(partno, mesid, machineDb, out string planId, out string recipeName);
             if (mesValidation != null) return mesValidation;
 
@@ -229,7 +192,7 @@ namespace ServiceBBAPI
             string weightError = GetWeightRecipe(partno, machno, machineDb, out double kgTieuChuan);
             if (weightError != null) return weightError;
 
-            string somesx = BatchCalculator.Calculate(kgTieuChuan, double.Parse(Soluong), keoSX, gioiHanKeo);
+            string somesx = BatchCalculator.Calculate(kgTieuChuan, soluongValue, keoSX, gioiHanKeo);
 
             bool insertSuccess = InsertPrdebe(planId, machno, daylimt, barcode, slipno, Soluong, pday,
                 effdat, classs, ptype, candao, partno, intime, indat, usrno, pallet, active, somesx);
@@ -252,7 +215,7 @@ namespace ServiceBBAPI
         {
             DateTime myPday = DateTime.ParseExact(pday, "yyyyMMdd", CultureInfo.InvariantCulture);
             pday = myPday.ToString("yyyyMMdd");
-            string machno = "V-BB37" + Machno;
+            string machno = BuildMachineCode(Machno);
             string classs = shift_id;
             string slipno = classs + Machno + "-" + pday.Substring(4, 4);
             string spday = ShiftHelper.BuildSpday(myPday);
@@ -281,12 +244,10 @@ namespace ServiceBBAPI
             if (!float.TryParse(Soluong, out float soluongValue) || soluongValue < 30)
                 return "Lỗi! Trọng lượng không phù hợp!";
 
-            string planNum = GetPlanNum(mesid, machineDb);
-
             string mesValidation = ValidateMesExists(partno, mesid, machineDb, out string planId, out string recipeName);
             if (mesValidation != null) return mesValidation;
 
-            if (makeo.StartsWith("R"))
+            if (makeo.StartsWith("R", StringComparison.Ordinal))
             {
                 string limitError = CheckKeoLimit(planId, recipeName, makeo, machno, Soluong, machineDb,
                     out float keoSXTemp, out float gioiHanTemp);
@@ -335,10 +296,8 @@ namespace ServiceBBAPI
                 printername = matchingPrinter;
             }
 
-            string filename = "_" + printername + ".xlsx";
-            string pathfolder = AppDomain.CurrentDomain.BaseDirectory + @"Data\";
-            string pathfile = pathfolder + filename;
-            EnsureDirectoryExists(pathfolder);
+            string filename = BuildPrintFileName(printername);
+            string pathfile = BuildPrintFilePath(filename);
 
             var machineDb = GetMachineDb(Machno);
 
@@ -356,7 +315,7 @@ namespace ServiceBBAPI
             if (dtOem.Rows.Count > 0)
                 description = "OEM";
 
-            string fullMachno = "V-BB37" + Machno;
+            string fullMachno = BuildMachineCode(Machno);
             DataTable dtsql = _erpDb.ExecuteQuery(
                 @"SELECT * FROM prdebe 
                   WHERE subno = '4' AND factory = 'V' 
@@ -369,19 +328,20 @@ namespace ServiceBBAPI
                 return "Không có dữ liệu TEM này!";
 
             DataRow row = dtsql.Rows[0];
-            string loaikeo = row["barcode"].ToString().Trim().Substring(0, 2);
-            string pallet = row["pallet_no"].ToString().Trim();
-            string indat = row["indat"].ToString().Trim();
-            string effdat = row["effdat"].ToString().Trim();
-            string intime = row["intime"].ToString().Trim();
-            string partno = row["partno"].ToString().Trim();
-            string slipno = row["slipno"].ToString().Trim();
-            string daylimt = row["daylimt"].ToString().Trim();
-            string pday = row["prodat"].ToString().Trim();
-            string soluong1 = row["weight"].ToString().Trim();
-            string classs = row["class"].ToString().Trim();
+            string barcodeValue = GetTrimmedRowValue(row, "barcode");
+            string loaikeo = barcodeValue.Substring(0, 2);
+            string pallet = GetTrimmedRowValue(row, "pallet_no");
+            string indat = GetTrimmedRowValue(row, "indat");
+            string effdat = GetTrimmedRowValue(row, "effdat");
+            string intime = GetTrimmedRowValue(row, "intime");
+            string partno = GetTrimmedRowValue(row, "partno");
+            string slipno = GetTrimmedRowValue(row, "slipno");
+            string daylimt = GetTrimmedRowValue(row, "daylimt");
+            string pday = GetTrimmedRowValue(row, "prodat");
+            string soluong1 = GetTrimmedRowValue(row, "weight");
+            string classs = GetTrimmedRowValue(row, "class");
             string ca = slipno.Substring(0, 1);
-            string someSX = row["some_sx"].ToString().Trim();
+            string someSX = GetTrimmedRowValue(row, "some_sx");
 
             string result = Get_Excel_InlaiBB.Create_Excel(partno, effdat, pathfile, loaikeo, slipno,
                 barcode.Trim(), ca, daylimt, soluong1, mesid, Machno, pday, indat, classs, intime,
@@ -445,6 +405,28 @@ namespace ServiceBBAPI
             {
                 System.Diagnostics.Debug.WriteLine($"[PDA MAC Update Error] {ex.Message}");
             }
+        }
+
+        private DataSet GetMesidListInternal(string machineNo, bool excludeVirtualPlans)
+        {
+            string shiftId = ShiftHelper.GetShiftMayBB();
+            string pday = ShiftHelper.GetPdayBB(shiftId);
+            DateTime parsedPday = DateTime.ParseExact(pday, "yyyyMMdd", CultureInfo.InvariantCulture);
+            string pdayFormatted = parsedPday.ToString("yyyy-MM-dd");
+            string virtualPlanFilter = excludeVirtualPlans ? " AND a.Plan_Id NOT LIKE 'V%'" : string.Empty;
+
+            var machineDb = GetMachineDb(machineNo);
+            DataTable dtMes = machineDb.ExecuteQuery(
+                @"SELECT a.Plan_Id, a.Recipe_Code 
+                  FROM [mfnsShareDB].[dbo].[IF_RtPlan2Mixing] a
+                  INNER JOIN [mfns].[dbo].[Ppt_GroupLot] b ON a.Plan_Id = b.MesPlanID
+                  WHERE a.Shift_Id = @shiftId 
+                    AND a.P_Date = @pday" + virtualPlanFilter + @"
+                    AND b.End_datetime IS NOT NULL",
+                new SqlParameter("@shiftId", shiftId),
+                new SqlParameter("@pday", pdayFormatted));
+
+            return CreateDataSet(dtMes);
         }
 
         private string ValidateMesPlan(string mesid, string pday, DatabaseHelper machineDb)
@@ -520,15 +502,6 @@ namespace ServiceBBAPI
             return makeo + spday + nextNumber.ToString("000");
         }
 
-        private string GetPlanNum(string mesid, DatabaseHelper machineDb)
-        {
-            DataTable dtPlan = machineDb.ExecuteQuery(
-                "SELECT Plan_Num FROM [mfnsShareDB].[dbo].[IF_RtPlan2Mixing] WHERE Plan_Id = @planId",
-                new SqlParameter("@planId", mesid));
-
-            return dtPlan.Rows.Count > 0 ? dtPlan.Rows[0][0].ToString().Trim() : "";
-        }
-
         private string ValidateMesExists(string partno, string mesid, DatabaseHelper machineDb,
             out string planId, out string recipeName)
         {
@@ -556,7 +529,7 @@ namespace ServiceBBAPI
             keoSX = 0;
             gioiHanKeo = 0;
 
-            if (!makeo.StartsWith("R"))
+            if (!makeo.StartsWith("R", StringComparison.Ordinal))
                 return null;
 
             DataTable dtPlan = machineDb.ExecuteQuery(
@@ -702,15 +675,42 @@ namespace ServiceBBAPI
                 new SqlParameter("@somesx", somesx));
         }
 
+        private string BuildMachineCode(string machineNo)
+        {
+            return MachinePrefix + machineNo;
+        }
+
+        private DataSet CreateDataSet(DataTable table)
+        {
+            DataSet ds = new DataSet();
+            ds.Tables.Add(table);
+            return ds;
+        }
+
+        private string BuildPrintFileName(string printerName)
+        {
+            return "_" + printerName + ".xlsx";
+        }
+
+        private string BuildPrintFilePath(string filename)
+        {
+            string pathfolder = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, DataFolderName);
+            EnsureDirectoryExists(pathfolder);
+            return Path.Combine(pathfolder, filename);
+        }
+
+        private string GetTrimmedRowValue(DataRow row, string columnName)
+        {
+            return row[columnName]?.ToString().Trim() ?? string.Empty;
+        }
+
         private string PrintLabel(string printername, string partno, string effdat, string makeo,
             string slipno, string barcode, string ca, string daylimt, string soluong, string mesid,
             string machno, string pday, string indat, string classs, string intime, string pallet,
             string oem, string somesx)
         {
-            string filename = "_" + printername + ".xlsx";
-            string pathfolder = AppDomain.CurrentDomain.BaseDirectory + @"Data\";
-            string pathfile = pathfolder + filename;
-            EnsureDirectoryExists(pathfolder);
+            string filename = BuildPrintFileName(printername);
+            string pathfile = BuildPrintFilePath(filename);
 
             string result = Get_Excel_BB.Create_Excel(partno, effdat, pathfile, makeo.Trim(), slipno,
                 barcode, ca, daylimt, soluong, mesid, machno, pday, indat, classs, intime, pallet, oem, somesx);
@@ -755,28 +755,23 @@ namespace ServiceBBAPI
             }
         }
 
+        private void DeleteFileIfExists(string pathfile)
+        {
+            if (File.Exists(pathfile))
+            {
+                File.Delete(pathfile);
+            }
+        }
+
         private string Print_Excel(string filename, string pathfile)
         {
             try
             {
-                string[] sp = filename.Split('_');
-                string printerName = sp[1].Substring(0, sp[1].Length - 5);
+                string printerName = Path.GetFileNameWithoutExtension(filename).TrimStart('_');
 
-                if (printerName.Length >= 9 && printerName.Substring(0, 9) == "Microsoft")
+                if (IsInvalidPrinterName(printerName))
                 {
-                    File.Delete(pathfile);
-                    return "Chon lai may in";
-                }
-
-                if (printerName.Length >= 5 && printerName.Substring(0, 5) == "Foxit")
-                {
-                    File.Delete(pathfile);
-                    return "Chon lai may in";
-                }
-
-                if (printerName.Length >= 3 && printerName.Substring(0, 3) == "Fax")
-                {
-                    File.Delete(pathfile);
+                    DeleteFileIfExists(pathfile);
                     return "Chon lai may in";
                 }
 
@@ -784,16 +779,22 @@ namespace ServiceBBAPI
                 string messager = "";
                 PrintExcel.Print_xls_file(printerName, pathfile, ref flag, ref messager);
 
-                if (File.Exists(pathfile))
-                    File.Delete(pathfile);
+                DeleteFileIfExists(pathfile);
 
-                return flag ? "" : sp[0];
+                return flag ? "" : messager;
             }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"[Print Error] {ex.Message}");
                 return "Lỗi kẹt lệnh in 9.245!";
             }
+        }
+
+        private bool IsInvalidPrinterName(string printerName)
+        {
+            return printerName.StartsWith("Microsoft", StringComparison.Ordinal)
+                || printerName.StartsWith("Foxit", StringComparison.Ordinal)
+                || printerName.StartsWith("Fax", StringComparison.Ordinal);
         }
 
         #endregion

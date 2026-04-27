@@ -1,9 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Runtime.InteropServices;
-using System.Web;
 using Microsoft.Office.Interop.Excel;
 
 namespace ServiceBBAPI
@@ -12,8 +9,6 @@ namespace ServiceBBAPI
     {
         public static void Print_xls_file(string printername, string pathFile, ref bool flag, ref string messager)
         {
-            bool flag1 = true;
-            string messager1 = "";
             try
             {
                 Microsoft.Office.Interop.Excel.Application excelApp = new Microsoft.Office.Interop.Excel.Application();
